@@ -1,7 +1,7 @@
 /** API client for backend endpoints. */
 import type { MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult } from './types';
 
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://industrial-layout-optimizer.onrender.com/api';
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
