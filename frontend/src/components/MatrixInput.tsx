@@ -135,41 +135,43 @@ export default function MatrixInput() {
                 ))}
               </tr>
             ))}
+            {/* Volume row — only for flow-based layout mode */}
             {mode === 'layout' && (
-              <>
-                <tr className="bg-[rgba(16,185,129,0.05)]">
-                  <td className="sticky left-0 z-10 px-3 py-2 bg-[var(--color-surface-light)] text-xs font-semibold text-[var(--color-text-muted)] whitespace-nowrap border-t border-[var(--color-surface-lighter)]">
-                    Volume
+              <tr className="bg-[rgba(16,185,129,0.05)]">
+                <td className="sticky left-0 z-10 px-3 py-2 bg-[var(--color-surface-light)] text-xs font-semibold text-[var(--color-text-muted)] whitespace-nowrap border-t border-[var(--color-surface-lighter)]">
+                  Volume
+                </td>
+                {partLabels.map((_, j) => (
+                  <td key={j} className="p-1 border border-[var(--color-surface-lighter)]">
+                    <input 
+                      type="number" min="1" 
+                      value={volumes?.[j] || 1}
+                      onChange={(e) => handleVolumeChange(j, e.target.value)}
+                      className="w-10 text-center bg-transparent text-white text-xs outline-none"
+                    />
                   </td>
-                  {partLabels.map((_, j) => (
-                    <td key={j} className="p-1 border border-[var(--color-surface-lighter)]">
-                      <input 
-                        type="number" min="1" 
-                        value={volumes?.[j] || 1}
-                        onChange={(e) => handleVolumeChange(j, e.target.value)}
-                        className="w-10 text-center bg-transparent text-white text-xs outline-none"
-                      />
-                    </td>
-                  ))}
-                </tr>
-                <tr className="bg-[rgba(16,185,129,0.05)]">
-                  <td className="sticky left-0 z-10 px-3 py-2 bg-[var(--color-surface-light)] text-xs font-semibold text-[var(--color-text-muted)] whitespace-nowrap border-t border-[var(--color-surface-lighter)]">
-                    Routing Seq
+                ))}
+              </tr>
+            )}
+            {/* Routing row — for flow-based AND connectivity-based modes */}
+            {(mode === 'layout' || mode === 'connectivity') && (
+              <tr className={mode === 'connectivity' ? 'bg-[rgba(168,85,247,0.05)]' : 'bg-[rgba(16,185,129,0.05)]'}>
+                <td className="sticky left-0 z-10 px-3 py-2 bg-[var(--color-surface-light)] text-xs font-semibold text-[var(--color-text-muted)] whitespace-nowrap border-t border-[var(--color-surface-lighter)]">
+                  Routing Seq
+                </td>
+                {partLabels.map((_, j) => (
+                  <td key={j} className="p-1 border border-[var(--color-surface-lighter)]">
+                    <input 
+                      type="text" 
+                      placeholder="e.g. M1,M2"
+                      value={getRoutingString(j)}
+                      onChange={(e) => handleRoutingChange(j, e.target.value)}
+                      className="w-10 text-center bg-transparent text-white text-[10px] outline-none"
+                      title="Enter machine sequence like 'M1, M3, M2' or '1, 3, 2'"
+                    />
                   </td>
-                  {partLabels.map((_, j) => (
-                    <td key={j} className="p-1 border border-[var(--color-surface-lighter)]">
-                      <input 
-                        type="text" 
-                        placeholder="e.g. M1,M2"
-                        value={getRoutingString(j)}
-                        onChange={(e) => handleRoutingChange(j, e.target.value)}
-                        className="w-10 text-center bg-transparent text-white text-[10px] outline-none"
-                        title="Enter machine sequence like 'M1, M3, M2' or '1, 3, 2'"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              </>
+                ))}
+              </tr>
             )}
           </tbody>
         </table>

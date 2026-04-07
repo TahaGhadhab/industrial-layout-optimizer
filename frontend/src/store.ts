@@ -1,10 +1,10 @@
 /** Zustand store for the Machine Layout Solver. */
 import { create } from 'zustand';
-import type { KingResult, FlowResult, LayoutResult, AnalyzeResult } from './types';
+import type { KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult } from './types';
 import * as api from './api';
 
-export type Mode = 'king' | 'layout';
-export type Tab = 'matrix' | 'flow_matrix' | 'triangular' | 'graph' | 'flow' | 'results';
+export type Mode = 'king' | 'layout' | 'connectivity';
+export type Tab = 'matrix' | 'flow_matrix' | 'triangular' | 'graph' | 'flow' | 'results' | 'structure_matrix' | 'connectivity_graph';
 
 interface SolverState {
   // Mode
@@ -28,6 +28,7 @@ interface SolverState {
   flowResult: FlowResult | null;
   layoutResult: LayoutResult | null;
   analyzeResult: AnalyzeResult | null;
+  connectivityResult: ConnectivityResult | null;
 
   // Actions
   setMatrix: (m: number[][], ml?: string[], pl?: string[]) => void;
@@ -46,6 +47,8 @@ interface SolverState {
   runLayout: () => Promise<void>;
   runOptimize: () => Promise<void>;
   runAnalyze: () => Promise<void>;
+  runConnectivity: () => Promise<void>;
+  runConnectivityOptimize: () => Promise<void>;
   importFile: (file: File) => Promise<void>;
   clearResults: () => void;
 }
@@ -63,7 +66,10 @@ const DEFAULT_PART_LABELS = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
 
 export const useStore = create<SolverState>((set, get) => ({
   mode: 'king',
-  setMode: (m) => set({ mode: m, activeTab: m === 'king' ? 'matrix' : 'flow_matrix' }),
+  setMode: (m) => set({ 
+    mode: m, 
+    activeTab: m === 'king' ? 'matrix' : m === 'connectivity' ? 'structure_matrix' : 'flow_matrix' 
+  }),
 
   matrix: DEFAULT_MATRIX,
   machineLabels: DEFAULT_MACHINE_LABELS,
@@ -78,6 +84,7 @@ export const useStore = create<SolverState>((set, get) => ({
   flowResult: null,
   layoutResult: null,
   analyzeResult: null,
+  connectivityResult: null,
 
   setMatrix: (m, ml, pl) => {
     const rows = m.length;
@@ -152,6 +159,7 @@ export const useStore = create<SolverState>((set, get) => ({
       layoutResult: null,
       flowResult: null,
       analyzeResult: null,
+      connectivityResult: null,
     });
   },
 
@@ -211,6 +219,36 @@ export const useStore = create<SolverState>((set, get) => ({
     }
   },
 
+  runConnectivity: async () => {
+    const { matrix, machineLabels, partLabels, routing } = get();
+    if (!routing || routing.length === 0) {
+      set({ error: "Routing is required for the connectivity-based chaining method.", loading: false });
+      return;
+    }
+    set({ loading: true, error: null });
+    try {
+      const result = await api.runConnectivity({ matrix, machine_labels: machineLabels, part_labels: partLabels, routing });
+      set({ connectivityResult: result, loading: false, activeTab: 'structure_matrix' });
+    } catch (e: any) {
+      set({ error: e.message, loading: false });
+    }
+  },
+
+  runConnectivityOptimize: async () => {
+    const { matrix, machineLabels, partLabels, routing } = get();
+    if (!routing || routing.length === 0) {
+      set({ error: "Routing is required for the connectivity-based chaining method.", loading: false });
+      return;
+    }
+    set({ loading: true, error: null });
+    try {
+      const result = await api.runConnectivityOptimize({ matrix, machine_labels: machineLabels, part_labels: partLabels, routing });
+      set({ connectivityResult: result, loading: false, activeTab: 'connectivity_graph' });
+    } catch (e: any) {
+      set({ error: e.message, loading: false });
+    }
+  },
+
   runAnalyze: async () => {
     const { matrix, machineLabels, partLabels, routing, volumes } = get();
     set({ loading: true, error: null });
@@ -235,11 +273,12 @@ export const useStore = create<SolverState>((set, get) => ({
         flowResult: null,
         layoutResult: null,
         analyzeResult: null,
+        connectivityResult: null,
       });
     } catch (e: any) {
       set({ error: e.message, loading: false });
     }
   },
 
-  clearResults: () => set({ kingResult: null, flowResult: null, layoutResult: null, analyzeResult: null, error: null }),
+  clearResults: () => set({ kingResult: null, flowResult: null, layoutResult: null, analyzeResult: null, connectivityResult: null, error: null }),
 }));

@@ -91,3 +91,21 @@ export interface AnalyzeResult {
   layout: LayoutResult;
   optimization_suggestions: string[];
 }
+
+export interface ConnectivityResult {
+  structure_matrix: number[][];
+  triangular_matrix: (number | null)[][];
+  connectivity: number[];
+  director_machine: string;
+  director_index: number;
+  machine_labels: string[];
+  layout: LayoutMachine[];
+  links: DirectedFlow[];
+  off_tram_links: DirectedFlow[];
+  off_tram_count: number;
+  crossings: number;
+  crossing_flows: { edge1: string[]; edge2: string[] }[];
+  total_links: number;
+  long_links: number;
+  optimality_ratio: number;
+}

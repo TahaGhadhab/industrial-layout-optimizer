@@ -1,5 +1,5 @@
 /** API client for backend endpoints. */
-import type { MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult } from './types';
+import type { MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || 'https://industrial-layout-optimizer.onrender.com/api';
 
@@ -36,6 +36,14 @@ export async function runAnalyze(input: MatrixInput): Promise<AnalyzeResult> {
   return post<AnalyzeResult>('/analyze', input);
 }
 
+export async function runConnectivity(input: MatrixInput): Promise<ConnectivityResult> {
+  return post<ConnectivityResult>('/connectivity', input);
+}
+
+export async function runConnectivityOptimize(input: MatrixInput): Promise<ConnectivityResult> {
+  return post<ConnectivityResult>('/connectivity-optimize', input);
+}
+
 export async function importFile(file: File): Promise<{ matrix: number[][]; machine_labels: string[]; part_labels: string[] }> {
   const formData = new FormData();
   formData.append('file', file);
@@ -53,3 +61,4 @@ export async function exportResults(data: unknown): Promise<Blob> {
   if (!res.ok) throw new Error('Export failed');
   return res.blob();
 }
+

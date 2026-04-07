@@ -7,6 +7,8 @@ import GraphView from './components/GraphView';
 import FlowView from './components/FlowView';
 import FlowMatrixView from './components/FlowMatrixView';
 import ResultsPanel from './components/ResultsPanel';
+import StructureMatrixView from './components/StructureMatrixView';
+import ConnectivityGraphView from './components/ConnectivityGraphView';
 import { exportResults } from './api';
 import { saveAs } from 'file-saver';
 
@@ -21,7 +23,13 @@ const TABS: Record<Mode, { id: Tab; label: string; icon: string }[]> = {
     { id: 'graph', label: 'Layout (Graph)', icon: '🕸️' },
     { id: 'flow', label: 'Crossings', icon: '❌' },
     { id: 'results', label: 'Results', icon: '📋' },
-  ]
+  ],
+  connectivity: [
+    { id: 'structure_matrix', label: 'Structure Matrix', icon: '🔗' },
+    { id: 'connectivity_graph', label: 'Layout (Graph)', icon: '🕸️' },
+    { id: 'flow', label: 'Crossings', icon: '❌' },
+    { id: 'results', label: 'Results', icon: '📋' },
+  ],
 };
 
 function TabContent() {
@@ -33,6 +41,8 @@ function TabContent() {
     case 'graph': return <GraphView />;
     case 'flow': return <FlowView />;
     case 'results': return <ResultsPanel />;
+    case 'structure_matrix': return <StructureMatrixView />;
+    case 'connectivity_graph': return <ConnectivityGraphView />;
     default: return null;
   }
 }
@@ -41,8 +51,11 @@ export default function App() {
   const {
     mode, setMode,
     activeTab, setActiveTab, loading, error,
-    runKing, runFlow, runLayout, runOptimize, runAnalyze, clearResults,
+    runKing, runFlow, runLayout, runOptimize, runAnalyze,
+    runConnectivity, runConnectivityOptimize,
+    clearResults,
     matrix, machineLabels, partLabels, kingResult, flowResult, layoutResult,
+    connectivityResult,
   } = useStore();
 
   const handleExport = async () => {
@@ -101,18 +114,24 @@ export default function App() {
             <h2 className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">
               Solver Mode
             </h2>
-            <div className="flex p-1 bg-[var(--color-surface-light)] rounded-lg">
+            <div className="flex p-1 bg-[var(--color-surface-light)] rounded-lg gap-1">
               <button 
                 onClick={() => setMode('king')}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === 'king' ? 'bg-[var(--color-primary)] text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'king' ? 'bg-[var(--color-primary)] text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
               >
-                Cell Formation (King)
+                👑 King
               </button>
               <button 
                 onClick={() => setMode('layout')}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === 'layout' ? 'bg-[var(--color-accent)] text-gray-900 shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'layout' ? 'bg-[var(--color-accent)] text-gray-900 shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
               >
-                Chaining Method (Layout)
+                🔄 Chaining (Flow)
+              </button>
+              <button 
+                onClick={() => setMode('connectivity')}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'connectivity' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
+              >
+                🔗 Chaining (Links)
               </button>
             </div>
           </div>
@@ -121,6 +140,7 @@ export default function App() {
             <h2 className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-wide mb-3 flex items-center justify-between">
               Input Data
               {mode === 'layout' && <span className="text-[10px] font-normal text-[var(--color-accent)]">Includes Volume & Routing</span>}
+              {mode === 'connectivity' && <span className="text-[10px] font-normal text-purple-400">Routing Only (No Volumes)</span>}
             </h2>
             
             <MatrixInput />
@@ -140,7 +160,7 @@ export default function App() {
                     {loading ? '⏳ Processing...' : '🔬 Full Analysis'}
                   </button>
                 </>
-              ) : (
+              ) : mode === 'layout' ? (
                 <>
                   <button onClick={runFlow} disabled={loading}
                     className="w-full py-2 rounded-lg font-semibold text-sm text-gray-900 transition-all disabled:opacity-50"
@@ -158,10 +178,24 @@ export default function App() {
                     {loading ? '⏳ Processing...' : '🚀 3. Optimize Layout'}
                   </button>
                 </>
+              ) : (
+                /* Connectivity mode */
+                <>
+                  <button onClick={runConnectivity} disabled={loading}
+                    className="w-full py-2 rounded-lg font-semibold text-sm text-white transition-all disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', boxShadow: '0 2px 12px rgba(168,85,247,0.3)' }}>
+                    {loading ? '⏳...' : '🔗 1. Build Structure & Layout'}
+                  </button>
+                  <button onClick={runConnectivityOptimize} disabled={loading}
+                    className="w-full py-2.5 rounded-lg font-semibold text-sm text-white transition-all disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)', boxShadow: '0 2px 12px rgba(124,58,237,0.3)' }}>
+                    {loading ? '⏳ Processing...' : '🚀 2. Optimize Layout'}
+                  </button>
+                </>
               )}
 
               {/* Clear button */}
-              {(kingResult || flowResult || layoutResult) && (
+              {(kingResult || flowResult || layoutResult || connectivityResult) && (
                 <button onClick={clearResults}
                   className="w-full py-1.5 mt-2 rounded-lg text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-surface-light)] transition-colors">
                   🗑️ Clear Results

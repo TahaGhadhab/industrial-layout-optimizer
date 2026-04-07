@@ -3,9 +3,9 @@ import { useStore } from '../store';
 
 const CELL_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4'];
 
-function EfficiencyGauge({ value, label, subtitle }: { value: number; label: string; subtitle?: string }) {
+function EfficiencyGauge({ value, label, subtitle, accentColor }: { value: number; label: string; subtitle?: string; accentColor?: string }) {
   const pct = Math.round(value * 100);
-  const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  const color = accentColor || (pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444');
   const circumference = 2 * Math.PI * 40;
   const dashOffset = circumference * (1 - value);
 
@@ -40,13 +40,14 @@ function StatCard({ label, value, icon, colorClass }: { label: string; value: st
 }
 
 export default function ResultsPanel() {
-  const { kingResult, layoutResult, flowResult, analyzeResult, mode } = useStore();
+  const { kingResult, layoutResult, flowResult, analyzeResult, connectivityResult, mode } = useStore();
 
   const activeKing = mode === 'king' ? kingResult || analyzeResult?.king : null;
   const activeLayout = mode === 'layout' ? layoutResult || analyzeResult?.layout : null;
-  const activeFlow = mode === 'layout' ? flowResult || activeLayout : null; // fallback to layout if flow alone not present
+  const activeFlow = mode === 'layout' ? flowResult || activeLayout : null;
+  const activeConnectivity = mode === 'connectivity' ? connectivityResult : null;
 
-  if (!activeKing && !activeLayout && !activeFlow) {
+  if (!activeKing && !activeLayout && !activeFlow && !activeConnectivity) {
     return (
       <div className="animate-fade-in flex items-center justify-center h-64 text-[var(--color-text-muted)]">
         <div className="text-center">
@@ -62,7 +63,7 @@ export default function ResultsPanel() {
   return (
     <div className="animate-fade-in space-y-6">
       
-      {/* Active Results Section */}
+      {/* King Mode Results */}
       {mode === 'king' && activeKing && (
         <div className="space-y-6">
           <div className="flex items-center justify-center p-4 rounded-xl bg-[var(--color-surface-light)] border border-[var(--color-surface-lighter)]">
@@ -94,7 +95,6 @@ export default function ResultsPanel() {
               </div>
             )}
 
-            {/* Exceptional parts */}
             {activeKing.exceptional_parts?.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-[var(--color-danger)] uppercase tracking-wide mb-3">
@@ -117,6 +117,7 @@ export default function ResultsPanel() {
         </div>
       )}
 
+      {/* Layout (Flow) Mode Results */}
       {mode === 'layout' && (activeFlow || activeLayout) && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -164,6 +165,98 @@ export default function ResultsPanel() {
                 ({Math.round(((activeLayout.off_tram_count || 0) / Math.max(1, activeLayout.flows?.length || 1)) * 100)}% ratio). 
                 Try using the <strong>Optimize Layout</strong> button to automatically rearrange machines around the director to maximize the $R_o$ metric and minimize off-tram flows.
               </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Connectivity Mode Results */}
+      {mode === 'connectivity' && activeConnectivity && (
+        <div className="space-y-6">
+          {/* Ro Gauge + Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="col-span-1 flex items-center justify-center p-4 rounded-xl bg-[var(--color-surface-light)] border border-[var(--color-surface-lighter)]">
+              <EfficiencyGauge 
+                value={activeConnectivity.optimality_ratio} 
+                label="Ro Metric" 
+                subtitle="Optimality" 
+                accentColor="#a855f7"
+              />
+            </div>
+            
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <StatCard 
+                label="Director Machine" 
+                value={activeConnectivity.director_machine} 
+                icon="👑" 
+                colorClass="bg-[rgba(168,85,247,0.1)] text-purple-400" 
+              />
+              <StatCard 
+                label="Total Links" 
+                value={activeConnectivity.total_links} 
+                icon="🔗" 
+                colorClass="bg-[rgba(99,102,241,0.1)] text-[var(--color-primary-light)]" 
+              />
+              <StatCard 
+                label="Edge Crossings" 
+                value={activeConnectivity.crossings} 
+                icon="❌" 
+                colorClass={activeConnectivity.crossings === 0 ? "bg-[rgba(16,185,129,0.1)] text-[var(--color-success)]" : "bg-[rgba(239,68,68,0.1)] text-[var(--color-danger)]"} 
+              />
+              <StatCard 
+                label="Off-Tram Links" 
+                value={`${activeConnectivity.off_tram_count} / ${activeConnectivity.total_links}`} 
+                icon="🔴" 
+                colorClass={activeConnectivity.off_tram_count === 0 ? "bg-[rgba(16,185,129,0.1)] text-[var(--color-success)]" : "bg-[rgba(239,68,68,0.1)] text-[var(--color-danger)]"} 
+              />
+            </div>
+          </div>
+
+          {/* Connectivity per machine */}
+          <div className="p-4 rounded-xl bg-[var(--color-surface-light)] border border-[var(--color-surface-lighter)]">
+            <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3 flex items-center gap-2">
+              <span>🔗</span> Connectivity per Machine
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              {activeConnectivity.machine_labels.map((m, i) => {
+                const isDirector = m === activeConnectivity.director_machine;
+                return (
+                  <div key={i} className={`p-3 rounded-lg border text-center transition-all ${
+                    isDirector 
+                      ? 'bg-[rgba(168,85,247,0.15)] border-purple-500/30 shadow-[0_0_12px_rgba(168,85,247,0.2)]' 
+                      : 'bg-[var(--color-surface)] border-[var(--color-surface-lighter)]'
+                  }`}>
+                    <div className={`text-sm font-bold ${isDirector ? 'text-purple-400' : 'text-white'}`}>
+                      {m} {isDirector && '👑'}
+                    </div>
+                    <div className="text-lg font-black text-white mt-1">
+                      {activeConnectivity.connectivity[i]}
+                    </div>
+                    <div className="text-[10px] text-[var(--color-text-muted)]">links</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Warnings */}
+          {(activeConnectivity.crossings > 0 || activeConnectivity.off_tram_count > 0) && (
+            <div className="p-4 rounded-xl bg-[rgba(168,85,247,0.05)] border border-[rgba(168,85,247,0.2)]">
+              <h3 className="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                <span>⚠️</span> Layout Inefficiencies Detected
+              </h3>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                This layout has {activeConnectivity.crossings} edge crossing(s) and {activeConnectivity.off_tram_count} off-tram link(s). 
+                Try using the <strong className="text-purple-300">Optimize Layout</strong> button to automatically rearrange machines and maximize the Ro metric.
+              </p>
+            </div>
+          )}
+
+          {activeConnectivity.crossings === 0 && activeConnectivity.off_tram_count === 0 && (
+            <div className="p-6 rounded-xl bg-[rgba(16,185,129,0.05)] border border-[rgba(16,185,129,0.2)] text-center flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-[rgba(16,185,129,0.1)] flex items-center justify-center text-3xl">✨</div>
+              <h4 className="font-bold text-lg text-[var(--color-success)]">Perfect Layout!</h4>
+              <p className="text-sm text-[var(--color-text-muted)]">No crossings and no off-tram links. The layout is optimal.</p>
             </div>
           )}
         </div>

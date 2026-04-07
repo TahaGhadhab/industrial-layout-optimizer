@@ -1,11 +1,18 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from .models import MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult
+from .models import MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult
 from .algorithms.king import king_method
 from .algorithms.layout import (
     build_flow_matrix, compute_traffic, select_director,
     triangular_matrix, build_layout, detect_crossings, optimize_layout
+)
+from .algorithms.connectivity import (
+    build_structure_matrix, compute_connectivity,
+    select_director as select_director_connectivity,
+    triangular_structure_matrix, build_layout_connectivity,
+    detect_crossings_connectivity, detect_off_tram,
+    optimize_layout_connectivity
 )
 from .algorithms.analysis import compute_optimization_suggestions
 import numpy as np
@@ -193,6 +200,96 @@ def run_analyze(data: MatrixInput):
         flow=flow_res,
         layout=opt_res,
         optimization_suggestions=suggestions
+    )
+
+
+@app.post("/api/connectivity", response_model=ConnectivityResult)
+def run_connectivity(data: MatrixInput):
+    """Run connectivity-based chaining method (initial layout)."""
+    if not data.routing:
+        raise HTTPException(status_code=400, detail="Routing is required for the connectivity-based chaining method.")
+    machine_labels, _ = _ensure_labels(data)
+    n = len(machine_labels)
+
+    # 1. Build binary structure matrix
+    S = build_structure_matrix(data.routing, n)
+
+    # 2. Compute connectivity
+    connectivity = compute_connectivity(S)
+
+    # 3. Select director
+    director_idx = select_director_connectivity(connectivity)
+
+    # 4. Triangular view
+    tri_mat = triangular_structure_matrix(S)
+
+    # 5. Build layout
+    lyt = build_layout_connectivity(S, connectivity, machine_labels)
+
+    # 6. Detect crossings & off-tram
+    cross_count, cross_flows = detect_crossings_connectivity(lyt, S, machine_labels)
+    links, off_tram_links, off_tram_count = detect_off_tram(lyt, S, machine_labels)
+
+    # 7. Compute Ro
+    total_links = len(links)
+    long_links = off_tram_count
+    ro = 1.0 - (cross_count + long_links) / max(1, total_links)
+
+    return ConnectivityResult(
+        structure_matrix=S,
+        triangular_matrix=tri_mat,
+        connectivity=connectivity,
+        director_machine=machine_labels[director_idx],
+        director_index=director_idx,
+        machine_labels=machine_labels,
+        layout=lyt,
+        links=links,
+        off_tram_links=off_tram_links,
+        off_tram_count=off_tram_count,
+        crossings=cross_count,
+        crossing_flows=cross_flows,
+        total_links=total_links,
+        long_links=long_links,
+        optimality_ratio=round(ro, 4)
+    )
+
+
+@app.post("/api/connectivity-optimize", response_model=ConnectivityResult)
+def run_connectivity_optimize(data: MatrixInput):
+    """Run connectivity-based chaining method with optimization."""
+    if not data.routing:
+        raise HTTPException(status_code=400, detail="Routing is required for the connectivity-based chaining method.")
+    machine_labels, _ = _ensure_labels(data)
+    n = len(machine_labels)
+
+    S = build_structure_matrix(data.routing, n)
+    connectivity = compute_connectivity(S)
+    director_idx = select_director_connectivity(connectivity)
+    tri_mat = triangular_structure_matrix(S)
+
+    base_lyt = build_layout_connectivity(S, connectivity, machine_labels)
+    opt_lyt, cross_count, long_links_count, ro = optimize_layout_connectivity(base_lyt, S, machine_labels)
+
+    _, cross_flows = detect_crossings_connectivity(opt_lyt, S, machine_labels)
+    links, off_tram_links, off_tram_count = detect_off_tram(opt_lyt, S, machine_labels)
+    total_links = len(links)
+
+    return ConnectivityResult(
+        structure_matrix=S,
+        triangular_matrix=tri_mat,
+        connectivity=connectivity,
+        director_machine=machine_labels[director_idx],
+        director_index=director_idx,
+        machine_labels=machine_labels,
+        layout=opt_lyt,
+        links=links,
+        off_tram_links=off_tram_links,
+        off_tram_count=off_tram_count,
+        crossings=cross_count,
+        crossing_flows=cross_flows,
+        total_links=total_links,
+        long_links=long_links_count,
+        optimality_ratio=round(ro, 4)
     )
 
 

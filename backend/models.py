@@ -60,6 +60,26 @@ class LayoutResult(BaseModel):
     off_tram_flows: list[dict] = []
     off_tram_count: int = 0
 
+
+class ConnectivityResult(BaseModel):
+    """Result of the connectivity-based chaining method."""
+    structure_matrix: list[list[int]]          # Binary structure matrix S
+    triangular_matrix: list[list[Optional[int]]]  # Upper-triangular view
+    connectivity: list[int]                    # Connectivity score per machine
+    director_machine: str                      # Machine with max connectivity
+    director_index: int
+    machine_labels: list[str]
+    layout: list[dict]                         # {machine, index, x, y}
+    links: list[dict]                          # All links (undirected, weight=1)
+    off_tram_links: list[dict]                 # Long-distance links
+    off_tram_count: int
+    crossings: int
+    crossing_flows: list[dict]
+    total_links: int
+    long_links: int
+    optimality_ratio: float                    # Ro metric
+
+
 class AnalyzeResult(BaseModel):
     """Full analysis result combining both methods."""
     king: KingResult
