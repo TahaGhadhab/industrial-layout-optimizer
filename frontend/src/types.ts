@@ -109,3 +109,57 @@ export interface ConnectivityResult {
   long_links: number;
   optimality_ratio: number;
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// SLP TYPES
+// ────────────────────────────────────────────────────────────────────────────
+
+export type RelCode = 'A' | 'E' | 'I' | 'O' | 'U' | 'X';
+
+export interface QualitativeRelEntry {
+  from: string;
+  to: string;
+  code: RelCode;
+  reason: string;
+}
+
+export interface SLPInput {
+  routings: Record<string, string[]>;
+  volumes?: Record<string, number>;
+  qualitative_rel?: QualitativeRelEntry[];
+  spaces?: Record<string, number>;
+  available_space?: number;
+}
+
+export interface SLPMetrics {
+  total_cost_initial: number;
+  total_cost_optimized: number;
+  improvement_percent: number;
+  optimality_ratio: number;
+  A_relations_satisfied: number;
+  X_relations_violated: number;
+  adjacency_score: number;
+}
+
+export interface SLPOptimizationStep {
+  step: number;
+  swap: [string, string];
+  cost_before: number;
+  cost_after: number;
+}
+
+export interface SLPResult {
+  machines: string[];
+  from_to_matrix: Record<string, Record<string, number>>;
+  rel_chart: Record<string, Record<string, RelCode>>;
+  rel_numeric: Record<string, Record<string, number>>;
+  rel_reasons: Record<string, Record<string, string>>;
+  scores: Record<string, number>;
+  director_machine: string;
+  layout: Record<string, { x: number; y: number }>;
+  initial_layout: Record<string, { x: number; y: number }>;
+  space_requirements: Record<string, number>;
+  space_ratio: number;
+  metrics: SLPMetrics;
+  optimization_steps: SLPOptimizationStep[];
+}

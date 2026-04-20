@@ -9,6 +9,11 @@ import FlowMatrixView from './components/FlowMatrixView';
 import ResultsPanel from './components/ResultsPanel';
 import StructureMatrixView from './components/StructureMatrixView';
 import ConnectivityGraphView from './components/ConnectivityGraphView';
+import SLPInput from './components/SLPInput';
+import SLPRelChart from './components/SLPRelChart';
+import SLPRelGraph from './components/SLPRelGraph';
+import SLPLayoutCanvas from './components/SLPLayoutCanvas';
+import SLPResults from './components/SLPResults';
 import { exportResults } from './api';
 import { saveAs } from 'file-saver';
 
@@ -30,6 +35,12 @@ const TABS: Record<Mode, { id: Tab; label: string; icon: string }[]> = {
     { id: 'flow', label: 'Crossings', icon: '❌' },
     { id: 'results', label: 'Results', icon: '📋' },
   ],
+  slp: [
+    { id: 'slp_rel_chart', label: 'REL Chart', icon: '📊' },
+    { id: 'slp_graph', label: 'Relationship Diagram', icon: '🕸️' },
+    { id: 'slp_layout', label: 'Layout Canvas', icon: '📐' },
+    { id: 'slp_results', label: 'Full Results', icon: '📋' },
+  ],
 };
 
 function TabContent() {
@@ -43,6 +54,10 @@ function TabContent() {
     case 'results': return <ResultsPanel />;
     case 'structure_matrix': return <StructureMatrixView />;
     case 'connectivity_graph': return <ConnectivityGraphView />;
+    case 'slp_rel_chart': return <SLPRelChart />;
+    case 'slp_graph': return <SLPRelGraph />;
+    case 'slp_layout': return <SLPLayoutCanvas />;
+    case 'slp_results': return <SLPResults />;
     default: return null;
   }
 }
@@ -53,9 +68,10 @@ export default function App() {
     activeTab, setActiveTab, loading, error,
     runKing, runFlow, runLayout, runOptimize, runAnalyze,
     runConnectivity, runConnectivityOptimize,
+    runSLP,
     clearResults,
     matrix, machineLabels, partLabels, kingResult, flowResult, layoutResult,
-    connectivityResult,
+    connectivityResult, slpResult,
   } = useStore();
 
   const handleExport = async () => {
@@ -114,24 +130,31 @@ export default function App() {
             <h2 className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">
               Solver Mode
             </h2>
-            <div className="flex p-1 bg-[var(--color-surface-light)] rounded-lg gap-1">
+            <div className="grid grid-cols-2 gap-1 p-1 bg-[var(--color-surface-light)] rounded-lg">
               <button 
                 onClick={() => setMode('king')}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'king' ? 'bg-[var(--color-primary)] text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
+                className={`py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'king' ? 'bg-[var(--color-primary)] text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
               >
                 👑 King
               </button>
               <button 
                 onClick={() => setMode('layout')}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'layout' ? 'bg-[var(--color-accent)] text-gray-900 shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
+                className={`py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'layout' ? 'bg-[var(--color-accent)] text-gray-900 shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
               >
                 🔄 Chaining (Flow)
               </button>
               <button 
                 onClick={() => setMode('connectivity')}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'connectivity' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
+                className={`py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'connectivity' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
               >
                 🔗 Chaining (Links)
+              </button>
+              <button 
+                onClick={() => setMode('slp')}
+                className={`py-1.5 text-xs font-medium rounded-md transition-all ${mode === 'slp' ? 'text-white shadow-md' : 'text-[var(--color-text-muted)] hover:text-white'}`}
+                style={mode === 'slp' ? { background: 'linear-gradient(135deg, #7c3aed, #a855f7)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' } : {}}
+              >
+                🗺️ SLP Method
               </button>
             </div>
           </div>
@@ -141,11 +164,17 @@ export default function App() {
               Input Data
               {mode === 'layout' && <span className="text-[10px] font-normal text-[var(--color-accent)]">Includes Volume & Routing</span>}
               {mode === 'connectivity' && <span className="text-[10px] font-normal text-purple-400">Routing Only (No Volumes)</span>}
+              {mode === 'slp' && <span className="text-[10px] font-normal text-purple-400">Systematic Layout Planning</span>}
             </h2>
             
-            <MatrixInput />
+            {mode === 'slp' ? (
+              <SLPInput />
+            ) : (
+              <MatrixInput />
+            )}
 
-            {/* Action buttons */}
+            {/* Action buttons — not shown for SLP (SLPInput handles its own run button) */}
+            {mode !== 'slp' && (
             <div className="mt-6 space-y-2">
               {mode === 'king' ? (
                 <>
@@ -165,7 +194,7 @@ export default function App() {
                   <button onClick={runFlow} disabled={loading}
                     className="w-full py-2 rounded-lg font-semibold text-sm text-gray-900 transition-all disabled:opacity-50"
                     style={{ background: 'linear-gradient(135deg, #fef08a, #facc15)' }}>
-                    {loading ? '⏳...' : '1. Calculate Flow & Traffic'}
+                    {loading ? '⏳...' : '1. Calculate Flow &amp; Traffic'}
                   </button>
                   <button onClick={runLayout} disabled={loading}
                     className="w-full py-2 rounded-lg font-semibold text-sm text-white transition-all disabled:opacity-50"
@@ -184,7 +213,7 @@ export default function App() {
                   <button onClick={runConnectivity} disabled={loading}
                     className="w-full py-2 rounded-lg font-semibold text-sm text-white transition-all disabled:opacity-50"
                     style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', boxShadow: '0 2px 12px rgba(168,85,247,0.3)' }}>
-                    {loading ? '⏳...' : '🔗 1. Build Structure & Layout'}
+                    {loading ? '⏳...' : '🔗 1. Build Structure &amp; Layout'}
                   </button>
                   <button onClick={runConnectivityOptimize} disabled={loading}
                     className="w-full py-2.5 rounded-lg font-semibold text-sm text-white transition-all disabled:opacity-50"
@@ -202,6 +231,15 @@ export default function App() {
                 </button>
               )}
             </div>
+            )}
+
+            {/* SLP clear button */}
+            {mode === 'slp' && slpResult && (
+              <button onClick={clearResults}
+                className="w-full py-1.5 mt-3 rounded-lg text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-surface-light)] transition-colors">
+                🗑️ Clear Results
+              </button>
+            )}
 
             {/* Error */}
             {error && (

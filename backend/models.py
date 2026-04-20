@@ -1,6 +1,6 @@
 """Pydantic models for API request/response."""
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Any
 
 
 class MatrixInput(BaseModel):
@@ -86,3 +86,60 @@ class AnalyzeResult(BaseModel):
     flow: FlowResult
     layout: LayoutResult
     optimization_suggestions: list[str]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SLP MODELS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class QualitativeRel(BaseModel):
+    """A single qualitative relationship entry."""
+    from_machine: str = Field(alias="from")
+    to_machine: str = Field(alias="to")
+    code: str  # A / E / I / O / U / X
+    reason: str = ""
+
+    model_config = {"populate_by_name": True}
+
+
+class SLPInput(BaseModel):
+    """Full SLP request body."""
+    routings: dict[str, list[str]]              # {"P1": ["M1", "M2", "M3"]}
+    volumes: Optional[dict[str, float]] = None  # {"P1": 150}
+    qualitative_rel: Optional[list[QualitativeRel]] = []
+    spaces: Optional[dict[str, float]] = None   # {"M1": 20}
+    available_space: Optional[float] = None
+
+
+class SLPMetrics(BaseModel):
+    total_cost_initial: float
+    total_cost_optimized: float
+    improvement_percent: float
+    optimality_ratio: float
+    A_relations_satisfied: int
+    X_relations_violated: int
+    adjacency_score: float
+
+
+class SLPOptimizationStep(BaseModel):
+    step: int
+    swap: list[str]
+    cost_before: float
+    cost_after: float
+
+
+class SLPResult(BaseModel):
+    """Full SLP result payload."""
+    machines: list[str]
+    from_to_matrix: dict[str, Any]
+    rel_chart: dict[str, Any]        # {"M1": {"M2": "A", ...}}
+    rel_numeric: dict[str, Any]      # {"M1": {"M2": 4, ...}}
+    rel_reasons: dict[str, Any]      # {"M1": {"M2": "noise", ...}}
+    scores: dict[str, int]
+    director_machine: str
+    layout: dict[str, Any]           # final optimized layout
+    initial_layout: dict[str, Any]   # before optimization
+    space_requirements: dict[str, float]
+    space_ratio: float
+    metrics: SLPMetrics
+    optimization_steps: list[SLPOptimizationStep]

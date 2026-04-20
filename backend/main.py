@@ -1,7 +1,11 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from .models import MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult
+from .models import (
+    MatrixInput, KingResult, FlowResult, LayoutResult,
+    AnalyzeResult, ConnectivityResult,
+    SLPInput, SLPResult,
+)
 from .algorithms.king import king_method
 from .algorithms.layout import (
     build_flow_matrix, compute_traffic, select_director,
@@ -15,6 +19,7 @@ from .algorithms.connectivity import (
     optimize_layout_connectivity
 )
 from .algorithms.analysis import compute_optimization_suggestions
+from .algorithms.slp import run_slp
 import numpy as np
 import pandas as pd
 import io
@@ -361,6 +366,43 @@ def export_results(data: dict):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SLP ENDPOINT
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/api/slp", response_model=SLPResult)
+def run_slp_endpoint(data: SLPInput):
+    """
+    Run the full SLP (Systematic Layout Planning) method.
+    Executes all 6 steps: Flow Analysis, REL Chart, ARD, Space, Layout, Optimization.
+    """
+    try:
+        # Convert QualitativeRel models to plain dicts for the algorithm
+        qual_list = [
+            {
+                "from": q.from_machine,
+                "to": q.to_machine,
+                "code": q.code,
+                "reason": q.reason,
+            }
+            for q in (data.qualitative_rel or [])
+        ]
+        result = run_slp(
+            routings=data.routings,
+            volumes=data.volumes,
+            qualitative_rel=qual_list if qual_list else None,
+            spaces=data.spaces,
+            available_space=data.available_space,
+        )
+        return SLPResult(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SLP computation error: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000)

@@ -1,5 +1,5 @@
 /** API client for backend endpoints. */
-import type { MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult } from './types';
+import type { MatrixInput, KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult, SLPInput, SLPResult } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || 'https://industrial-layout-optimizer.onrender.com/api';
 
@@ -62,3 +62,6 @@ export async function exportResults(data: unknown): Promise<Blob> {
   return res.blob();
 }
 
+export async function runSLP(input: SLPInput): Promise<SLPResult> {
+  return post<SLPResult>('/slp', input);
+}

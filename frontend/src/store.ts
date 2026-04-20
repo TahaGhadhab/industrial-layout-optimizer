@@ -1,10 +1,10 @@
 /** Zustand store for the Machine Layout Solver. */
 import { create } from 'zustand';
-import type { KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult } from './types';
+import type { KingResult, FlowResult, LayoutResult, AnalyzeResult, ConnectivityResult, SLPInput, SLPResult, QualitativeRelEntry } from './types';
 import * as api from './api';
 
-export type Mode = 'king' | 'layout' | 'connectivity';
-export type Tab = 'matrix' | 'flow_matrix' | 'triangular' | 'graph' | 'flow' | 'results' | 'structure_matrix' | 'connectivity_graph';
+export type Mode = 'king' | 'layout' | 'connectivity' | 'slp';
+export type Tab = 'matrix' | 'flow_matrix' | 'triangular' | 'graph' | 'flow' | 'results' | 'structure_matrix' | 'connectivity_graph' | 'slp_rel_chart' | 'slp_graph' | 'slp_layout' | 'slp_results';
 
 interface SolverState {
   // Mode
@@ -29,6 +29,14 @@ interface SolverState {
   layoutResult: LayoutResult | null;
   analyzeResult: AnalyzeResult | null;
   connectivityResult: ConnectivityResult | null;
+  slpResult: SLPResult | null;
+
+  // SLP-specific input state
+  slpRoutingText: string;
+  slpVolumeText: string;
+  slpQualRel: QualitativeRelEntry[];
+  slpSpaceText: string;
+  slpAvailableSpace: string;
 
   // Actions
   setMatrix: (m: number[][], ml?: string[], pl?: string[]) => void;
@@ -42,6 +50,13 @@ interface SolverState {
   removeCol: () => void;
   generateRandom: (rows: number, cols: number, density: number) => void;
   
+  // SLP input setters
+  setSlpRoutingText: (t: string) => void;
+  setSlpVolumeText: (t: string) => void;
+  setSlpQualRel: (r: QualitativeRelEntry[]) => void;
+  setSlpSpaceText: (t: string) => void;
+  setSlpAvailableSpace: (t: string) => void;
+  
   runKing: () => Promise<void>;
   runFlow: () => Promise<void>;
   runLayout: () => Promise<void>;
@@ -49,6 +64,7 @@ interface SolverState {
   runAnalyze: () => Promise<void>;
   runConnectivity: () => Promise<void>;
   runConnectivityOptimize: () => Promise<void>;
+  runSLP: () => Promise<void>;
   importFile: (file: File) => Promise<void>;
   clearResults: () => void;
 }
@@ -68,7 +84,7 @@ export const useStore = create<SolverState>((set, get) => ({
   mode: 'king',
   setMode: (m) => set({ 
     mode: m, 
-    activeTab: m === 'king' ? 'matrix' : m === 'connectivity' ? 'structure_matrix' : 'flow_matrix' 
+    activeTab: m === 'king' ? 'matrix' : m === 'connectivity' ? 'structure_matrix' : m === 'slp' ? 'slp_rel_chart' : 'flow_matrix'
   }),
 
   matrix: DEFAULT_MATRIX,
@@ -85,6 +101,14 @@ export const useStore = create<SolverState>((set, get) => ({
   layoutResult: null,
   analyzeResult: null,
   connectivityResult: null,
+  slpResult: null,
+
+  // SLP default input
+  slpRoutingText: 'P1: M1 -> M2 -> M3\nP2: M1 -> M3 -> M4\nP3: M2 -> M4',
+  slpVolumeText: 'P1: 150\nP2: 200\nP3: 100',
+  slpQualRel: [],
+  slpSpaceText: '',
+  slpAvailableSpace: '',
 
   setMatrix: (m, ml, pl) => {
     const rows = m.length;
@@ -160,8 +184,16 @@ export const useStore = create<SolverState>((set, get) => ({
       flowResult: null,
       analyzeResult: null,
       connectivityResult: null,
+      slpResult: null,
     });
   },
+
+  // SLP input setters
+  setSlpRoutingText: (t) => set({ slpRoutingText: t }),
+  setSlpVolumeText: (t) => set({ slpVolumeText: t }),
+  setSlpQualRel: (r) => set({ slpQualRel: r }),
+  setSlpSpaceText: (t) => set({ slpSpaceText: t }),
+  setSlpAvailableSpace: (t) => set({ slpAvailableSpace: t }),
 
   runKing: async () => {
     const { matrix, machineLabels, partLabels } = get();
@@ -274,11 +306,72 @@ export const useStore = create<SolverState>((set, get) => ({
         layoutResult: null,
         analyzeResult: null,
         connectivityResult: null,
+        slpResult: null,
       });
     } catch (e: any) {
       set({ error: e.message, loading: false });
     }
   },
 
-  clearResults: () => set({ kingResult: null, flowResult: null, layoutResult: null, analyzeResult: null, connectivityResult: null, error: null }),
+  // ------- SLP -------
+  runSLP: async () => {
+    const { slpRoutingText, slpVolumeText, slpQualRel, slpSpaceText, slpAvailableSpace } = get();
+    set({ loading: true, error: null });
+    try {
+      // Parse routing text: "P1: M1 -> M2 -> M3"
+      const routings: Record<string, string[]> = {};
+      slpRoutingText.split('\n').forEach(line => {
+        const match = line.match(/^\s*([^:]+):\s*(.+)$/);
+        if (match) {
+          const part = match[1].trim();
+          const machines = match[2].split(/\s*(?:->|→|,|\s)\s*/).map(m => m.trim()).filter(Boolean);
+          if (machines.length > 0) routings[part] = machines;
+        }
+      });
+
+      if (Object.keys(routings).length === 0) {
+        set({ error: 'Please enter at least one routing sequence.', loading: false });
+        return;
+      }
+
+      // Parse volume text: "P1: 150"
+      let volumes: Record<string, number> | undefined;
+      if (slpVolumeText.trim()) {
+        volumes = {};
+        slpVolumeText.split('\n').forEach(line => {
+          const match = line.match(/^\s*([^:]+):\s*([\d.]+)/);
+          if (match) volumes![match[1].trim()] = parseFloat(match[2]);
+        });
+        if (Object.keys(volumes).length === 0) volumes = undefined;
+      }
+
+      // Parse space text: "M1: 20"
+      let spaces: Record<string, number> | undefined;
+      if (slpSpaceText.trim()) {
+        spaces = {};
+        slpSpaceText.split('\n').forEach(line => {
+          const match = line.match(/^\s*([^:]+):\s*([\d.]+)/);
+          if (match) spaces![match[1].trim()] = parseFloat(match[2]);
+        });
+        if (Object.keys(spaces).length === 0) spaces = undefined;
+      }
+
+      const availableSpace = slpAvailableSpace.trim() ? parseFloat(slpAvailableSpace) : undefined;
+
+      const input: import('./types').SLPInput = {
+        routings,
+        volumes,
+        qualitative_rel: slpQualRel.length > 0 ? slpQualRel : undefined,
+        spaces,
+        available_space: availableSpace,
+      };
+
+      const result = await api.runSLP(input);
+      set({ slpResult: result, loading: false, activeTab: 'slp_rel_chart' });
+    } catch (e: any) {
+      set({ error: e.message, loading: false });
+    }
+  },
+
+  clearResults: () => set({ kingResult: null, flowResult: null, layoutResult: null, analyzeResult: null, connectivityResult: null, slpResult: null, error: null }),
 }));
