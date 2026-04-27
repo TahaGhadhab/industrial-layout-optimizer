@@ -104,7 +104,7 @@ export default function App() {
         king_result: kingResult,
         flow: flowResult,
         layout: layoutResult || connectivityResult,
-        flows: layoutResult?.flows || connectivityResult?.flows || [],
+        flows: layoutResult?.flows || connectivityResult?.links || [],
         metrics: {
            optimality_ratio: layoutResult?.optimality_ratio || connectivityResult?.optimality_ratio || 0,
            crossings: layoutResult?.crossings || connectivityResult?.crossings || 0,
