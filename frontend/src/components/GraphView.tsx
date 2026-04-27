@@ -76,23 +76,25 @@ export default function GraphView() {
         <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
           Physical Layout Map (x, y)
         </h3>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="flex items-center gap-1 text-[var(--color-text-muted)]">
+        <div className="flex items-center gap-4 text-xs bg-[var(--color-surface)] px-3 py-1.5 rounded-lg border border-[var(--color-surface-lighter)] shadow-sm">
+          <span className="font-semibold text-white mr-1">Legend:</span>
+          <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
             <span className="inline-block w-3 h-3 rounded-full bg-[var(--color-accent)] shadow-[0_0_8px_var(--color-accent)]" /> 
             Director
           </span>
-          <span className="flex items-center gap-1 text-[var(--color-text-muted)]">
+          <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
             <span className="flex items-center w-6 relative">
-              <span className="block w-full h-1 bg-[var(--color-success)] opacity-70" />
-              <div className="absolute right-0 -top-[3px] border-y-4 border-l-4 border-y-transparent border-l-[var(--color-success)] opacity-70" />
+              <span className="block w-full h-[1.5px] bg-[var(--color-success)] opacity-70" />
+              <div className="absolute right-0 -top-[3px] border-y-[4px] border-l-[5px] border-y-transparent border-l-[var(--color-success)] opacity-70" />
             </span> 
-            Flow Head
+            Direction
           </span>
-          <span className="flex items-center gap-1 text-[var(--color-text-muted)]">
-            <span className="flex items-center w-6 relative">
-              <span className="block w-full border-t-2 border-dashed border-[var(--color-danger)] opacity-80" />
-              <div className="absolute right-0 -top-[4px] border-y-[5px] border-l-[5px] border-y-transparent border-l-[var(--color-danger)] opacity-80" />
-            </span> 
+          <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
+             <span className="block w-6 h-[4px] bg-[var(--color-success)] opacity-70 rounded-full" />
+             High Traffic
+          </span>
+          <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
+            <span className="block w-6 border-t-2 border-dashed border-[var(--color-danger)] opacity-80" />
             Off-Tram
           </span>
         </div>
@@ -171,7 +173,7 @@ export default function GraphView() {
                   className="transition-all duration-300"
                 />
                 <title>
-                  {`From: ${edge.source.id}\nTo: ${edge.target.id}\nFlow Weight: ${edge.flow}\nDistance: ${edge.distance}\nStatus: ${edge.isOffTram ? 'OFF-TRAM' : 'NORMAL'}`}
+                  {`From: ${edge.source.id} → To: ${edge.target.id}\nTraffic Weight: ${edge.flow}\nDistance: ${edge.distance}\nStatus: ${edge.isOffTram ? 'OFF-TRAM (Red)' : 'NORMAL (Blue/Gray)'}`}
                 </title>
               </g>
             );

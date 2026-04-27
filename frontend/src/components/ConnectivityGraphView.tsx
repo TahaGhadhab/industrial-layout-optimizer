@@ -71,16 +71,20 @@ export default function ConnectivityGraphView() {
         <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
           Connectivity Layout Map (x, y)
         </h3>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="flex items-center gap-1 text-[var(--color-text-muted)]">
+        <div className="flex items-center gap-4 text-xs bg-[var(--color-surface)] px-3 py-1.5 rounded-lg border border-[var(--color-surface-lighter)] shadow-sm">
+          <span className="font-semibold text-white mr-1">Legend:</span>
+          <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
             <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-400 shadow-[0_0_8px_rgba(168,85,247,0.5)]" /> 
             Director
           </span>
-          <span className="flex items-center gap-1 text-[var(--color-text-muted)]">
-            <span className="block w-6 h-0.5 bg-purple-400 opacity-70 rounded" /> 
-            Link
+          <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
+            <span className="flex items-center w-6 relative">
+              <span className="block w-full h-[1.5px] bg-purple-400 opacity-70" />
+              <div className="absolute right-0 -top-[3px] border-y-[4px] border-l-[5px] border-y-transparent border-l-purple-400 opacity-70" />
+            </span> 
+            Direction
           </span>
-          <span className="flex items-center gap-1 text-[var(--color-text-muted)]">
+          <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
             <span className="block w-6 border-t-2 border-dashed border-[var(--color-danger)] opacity-80" /> 
             Off-Tram
           </span>
@@ -101,6 +105,20 @@ export default function ConnectivityGraphView() {
                 <feMergeNode in="SourceGraphic"/>
               </feMerge>
             </filter>
+
+            {/* Arrow Markers */}
+            <marker id="arrow-conn-normal" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(168, 85, 247, 0.6)" />
+            </marker>
+            <marker id="arrow-conn-hover" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#a855f7" />
+            </marker>
+            <marker id="arrow-conn-offtram" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(239, 68, 68, 0.8)" />
+            </marker>
+            <marker id="arrow-conn-offtram-hover" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-danger)" />
+            </marker>
           </defs>
 
           {/* Background grid */}
@@ -113,7 +131,7 @@ export default function ConnectivityGraphView() {
             ))}
           </g>
 
-          {/* Edges — uniform weight, no arrows (undirected) */}
+          {/* Edges */}
           {edges.map((edge: any, i: number) => {
             const isHovered = hoverNode === edge.source.id || hoverNode === edge.target.id;
             const opacity = hoverNode ? (isHovered ? 0.9 : 0.1) : 0.6;
@@ -121,10 +139,14 @@ export default function ConnectivityGraphView() {
 
             let color = 'rgba(168, 85, 247, 0.6)';
             let hoverColor = '#a855f7';
+            let marker = 'url(#arrow-conn-normal)';
 
             if (edge.isOffTram) {
               color = 'rgba(239, 68, 68, 0.6)';
               hoverColor = 'var(--color-danger)';
+              marker = isHovered ? 'url(#arrow-conn-offtram-hover)' : 'url(#arrow-conn-offtram)';
+            } else if (isHovered) {
+              marker = 'url(#arrow-conn-hover)';
             }
 
             return (
@@ -138,10 +160,11 @@ export default function ConnectivityGraphView() {
                   strokeWidth={thickness}
                   strokeOpacity={opacity}
                   strokeDasharray={edge.isOffTram ? "6,4" : "none"}
+                  markerEnd={marker}
                   className="transition-all duration-300"
                 />
                 <title>
-                  {`${edge.source.id} ↔ ${edge.target.id}\nDistance: ${edge.distance}\nStatus: ${edge.isOffTram ? 'OFF-TRAM' : 'NORMAL'}`}
+                  {`From: ${edge.source.id} → To: ${edge.target.id}\nDistance: ${edge.distance}\nStatus: ${edge.isOffTram ? 'OFF-TRAM (Red)' : 'NORMAL (Purple)'}`}
                 </title>
               </g>
             );

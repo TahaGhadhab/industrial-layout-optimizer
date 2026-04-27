@@ -62,6 +62,16 @@ export async function exportResults(data: unknown): Promise<Blob> {
   return res.blob();
 }
 
+export async function exportPDF(data: unknown): Promise<Blob> {
+  const res = await fetch(`${BASE}/export-pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Export PDF failed');
+  return res.blob();
+}
+
 export async function runSLP(input: SLPInput): Promise<SLPResult> {
   return post<SLPResult>('/slp', input);
 }

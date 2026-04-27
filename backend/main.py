@@ -24,6 +24,10 @@ import numpy as np
 import pandas as pd
 import io
 import json
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
 
 
 app = FastAPI(title="Machine Layout Solver", version="1.0.0")
@@ -360,6 +364,84 @@ def export_results(data: dict):
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=layout_solver_results.xlsx"},
+    )
+
+
+@app.post("/api/export-pdf")
+def export_pdf(data: dict):
+    """Generate a PDF report of the layout optimization results."""
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter)
+    styles = getSampleStyleSheet()
+    title_style = styles['Heading1']
+    h2_style = styles['Heading2']
+    normal_style = styles['Normal']
+    
+    elements = []
+    
+    # Title
+    elements.append(Paragraph("Machine Layout Optimization Report", title_style))
+    elements.append(Spacer(1, 12))
+    
+    # Section 1: Input Summary
+    if "king_result" in data or "layout" in data:
+        elements.append(Paragraph("1. Optimization Summary", h2_style))
+        
+        if "king_result" in data and data["king_result"]:
+            king = data["king_result"]
+            elements.append(Paragraph(f"King's Method Efficiency: {king.get('efficiency', 0):.2f}%", normal_style))
+            
+        if "layout" in data and data["layout"]:
+            lyt = data["layout"]
+            elements.append(Paragraph(f"Director Machine: {lyt.get('director_machine', 'N/A')}", normal_style))
+            elements.append(Paragraph(f"Crossings: {lyt.get('crossings', 0)}", normal_style))
+            elements.append(Paragraph(f"Off-tram Flows: {lyt.get('off_tram_count', 0)}", normal_style))
+            elements.append(Paragraph(f"Optimality Ratio (Ro): {lyt.get('optimality_ratio', 0)}", normal_style))
+        elements.append(Spacer(1, 12))
+
+    # Section 2: King Results
+    if "king_result" in data and data["king_result"]:
+        elements.append(Paragraph("2. King's Method Results (Cells)", h2_style))
+        king = data["king_result"]
+        cells = king.get("cells", [])
+        if cells:
+            for i, cell in enumerate(cells):
+                machines = ", ".join(cell.get("machines", []))
+                parts = ", ".join(cell.get("parts", []))
+                elements.append(Paragraph(f"<b>Cell {i+1}:</b> Machines: {machines} | Parts: {parts}", normal_style))
+        else:
+            elements.append(Paragraph("No cells formed.", normal_style))
+        elements.append(Spacer(1, 12))
+
+    # Section 3: Flows
+    if "flows" in data and data["flows"]:
+        elements.append(Paragraph("3. Flow Summary", h2_style))
+        flows = data["flows"]
+        flow_data = [["From", "To", "Weight", "Distance"]]
+        for f in flows:
+            flow_data.append([str(f.get("from", "")), str(f.get("to", "")), str(f.get("weight", "")), str(f.get("distance", ""))])
+        
+        if len(flow_data) > 1:
+            t = Table(flow_data)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            elements.append(t)
+        elements.append(Spacer(1, 12))
+
+    doc.build(elements)
+    
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=layout_report.pdf"},
     )
 
 

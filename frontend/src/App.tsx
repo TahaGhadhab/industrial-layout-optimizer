@@ -14,8 +14,10 @@ import SLPRelChart from './components/SLPRelChart';
 import SLPRelGraph from './components/SLPRelGraph';
 import SLPLayoutCanvas from './components/SLPLayoutCanvas';
 import SLPResults from './components/SLPResults';
-import { exportResults } from './api';
+import { exportResults, exportPDF } from './api';
 import { saveAs } from 'file-saver';
+import { useState } from 'react';
+import HelpPage from './components/HelpPage';
 
 const TABS: Record<Mode, { id: Tab; label: string; icon: string }[]> = {
   king: [
@@ -63,6 +65,8 @@ function TabContent() {
 }
 
 export default function App() {
+  const [showHelp, setShowHelp] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const {
     mode, setMode,
     activeTab, setActiveTab, loading, error,
@@ -90,6 +94,31 @@ export default function App() {
     }
   };
 
+  const handleExportPDF = async () => {
+    try {
+      setPdfLoading(true);
+      const data = {
+        matrix,
+        machine_labels: machineLabels,
+        part_labels: partLabels,
+        king_result: kingResult,
+        flow: flowResult,
+        layout: layoutResult || connectivityResult,
+        flows: layoutResult?.flows || connectivityResult?.flows || [],
+        metrics: {
+           optimality_ratio: layoutResult?.optimality_ratio || connectivityResult?.optimality_ratio || 0,
+           crossings: layoutResult?.crossings || connectivityResult?.crossings || 0,
+        }
+      };
+      const blob = await exportPDF(data);
+      saveAs(blob, 'layout_report.pdf');
+    } catch (e) {
+      console.error('PDF Export failed:', e);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const currentTabs = TABS[mode] || TABS.king;
 
   return (
@@ -111,6 +140,14 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setShowHelp(!showHelp)}
+              className={`btn-sm text-xs ${showHelp ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-surface-lighter)] text-[var(--color-text-muted)] hover:text-white'}`}>
+              ❓ Help
+            </button>
+            <button onClick={handleExportPDF} disabled={pdfLoading}
+              className="btn-sm bg-[var(--color-surface-lighter)] hover:bg-[var(--color-danger)] text-white text-xs disabled:opacity-50">
+              {pdfLoading ? '⏳...' : '📄 Export PDF'}
+            </button>
             <button onClick={handleExport}
               className="btn-sm bg-[var(--color-surface-lighter)] hover:bg-[var(--color-primary)] text-white text-xs">
               📤 Export Excel
@@ -268,7 +305,7 @@ export default function App() {
 
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto p-4 bg-[var(--color-surface)]" style={{ maxHeight: 'calc(100vh - 112px)' }}>
-            <TabContent />
+            {showHelp ? <HelpPage /> : <TabContent />}
           </div>
         </div>
       </main>
